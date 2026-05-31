@@ -76,17 +76,8 @@ export interface Photo {
 }
 
 // ---- Composite / display types ----
-export interface FieldDefinition {
-  id: string;
-  category_id?: string;
-  key: string;
-  label: string;
-  data_type: DataType;
-  options?: string[];
-  unit?: string;
-  required: boolean;
-  sort_order: number;
-}
+// FieldDefinition is the API-layer alias for Field (used in service layer returns)
+export type FieldDefinition = Field;
 
 export interface ItemDetail extends Item {
   category_name?: string;
