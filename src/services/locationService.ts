@@ -1,5 +1,5 @@
 import { db } from '../db/database';
-import type { Location, LocationTreeNode, LocationType } from '../types';
+import type { Location, LocationTreeNode } from '../types';
 
 export async function createLocation(input: Partial<Location>): Promise<Location> {
   const location: Location = {
