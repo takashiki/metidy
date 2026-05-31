@@ -49,7 +49,7 @@ export function FieldManager() {
 
   return (
     <div className="space-y-4">
-      <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+      <Select value={selectedCategoryId} onValueChange={(v) => setSelectedCategoryId(v ?? '')}>
         <SelectTrigger><SelectValue placeholder="选择分类查看/添加字段" /></SelectTrigger>
         <SelectContent>
           {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
