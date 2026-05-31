@@ -26,8 +26,8 @@ export function ItemFilterBar({ categories, onFilterChange }: ItemFilterBarProps
   };
 
   const handleSearch = (v: string) => { setSearch(v); apply(v, categoryId, status); };
-  const handleCategory = (v: string) => { setCategoryId(v); apply(search, v, status); };
-  const handleStatus = (v: string) => { setStatus(v); apply(search, categoryId, v); };
+  const handleCategory = (v: string | null) => { setCategoryId(v ?? 'all'); apply(search, v ?? 'all', status); };
+  const handleStatus = (v: string | null) => { setStatus(v ?? 'all'); apply(search, categoryId, v ?? 'all'); };
 
   const clear = () => {
     setSearch(''); setCategoryId('all'); setStatus('all');

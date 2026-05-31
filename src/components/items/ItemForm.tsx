@@ -95,7 +95,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
         </div>
         <div>
           <Label>分类 *</Label>
-          <Select value={categoryId} onValueChange={setCategoryId} required>
+          <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? '')} required>
             <SelectTrigger><SelectValue placeholder="选择分类" /></SelectTrigger>
             <SelectContent>
               {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
@@ -113,7 +113,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
           </div>
           <div>
             <Label>状态</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as ItemStatus)}>
+            <Select value={status} onValueChange={(v) => setStatus((v as ItemStatus) ?? '在用')}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -132,7 +132,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>位置</Label>
-            <Select value={locationId} onValueChange={setLocationId}>
+            <Select value={locationId} onValueChange={(v) => setLocationId(v ?? '')}>
               <SelectTrigger><SelectValue placeholder="选择位置" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
@@ -144,7 +144,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
           </div>
           <div>
             <Label>购入渠道</Label>
-            <Select value={channelId} onValueChange={setChannelId}>
+            <Select value={channelId} onValueChange={(v) => setChannelId(v ?? '')}>
               <SelectTrigger><SelectValue placeholder="选择渠道" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
@@ -168,7 +168,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>评分</Label>
-            <Select value={rating} onValueChange={setRating}>
+            <Select value={rating} onValueChange={(v) => setRating(v ?? '')}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
@@ -178,7 +178,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
           </div>
           <div>
             <Label>重要性</Label>
-            <Select value={importance} onValueChange={setImportance}>
+            <Select value={importance} onValueChange={(v) => setImportance(v ?? '')}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
