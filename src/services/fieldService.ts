@@ -11,7 +11,7 @@ export async function getFieldsByCategory(categoryId: string): Promise<FieldDefi
 
 export async function getGlobalFields(): Promise<FieldDefinition[]> {
   const fields = await db.fields
-    .filter(f => f.category_id === undefined || f.category_id === null)
+    .filter(f => f.category_id === undefined || f.category_id === null || f.category_id === '')
     .sortBy('sort_order');
   return fields;
 }

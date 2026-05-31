@@ -5,6 +5,8 @@ import {
   getAllChannels,
   incrementChannelUsage,
   createChannel,
+  updateChannel,
+  deleteChannel,
 } from '../../src/services/channelService';
 
 describe('channelService', () => {
@@ -12,6 +14,8 @@ describe('channelService', () => {
     await db.categories.clear();
     await db.channels.clear();
     await db.fields.clear();
+    await db.items.clear();
+    await db.item_field_values.clear();
     await seedDatabase();
   });
 
@@ -34,5 +38,20 @@ describe('channelService', () => {
     const created = await createChannel({ name: 'Costco' });
     expect(created.usage_count).toBe(0);
     expect(created.name).toBe('Costco');
+  });
+
+  it('updateChannel() modifies existing channel', async () => {
+    await updateChannel('ch-001', { name: '京东自营', icon: 'star' });
+    const ch = await db.channels.get('ch-001');
+    expect(ch?.name).toBe('京东自营');
+    expect(ch?.icon).toBe('star');
+  });
+
+  it('deleteChannel() removes channel', async () => {
+    await deleteChannel('ch-001');
+    const ch = await db.channels.get('ch-001');
+    expect(ch).toBeUndefined();
+    const all = await getAllChannels();
+    expect(all.length).toBe(4);
   });
 });

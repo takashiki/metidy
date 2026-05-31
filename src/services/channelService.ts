@@ -8,15 +8,14 @@ export async function getAllChannels(): Promise<Channel[]> {
 }
 
 export async function incrementChannelUsage(id: string): Promise<void> {
-  const ch = await db.channels.get(id);
-  if (ch) {
-    await db.channels.update(id, { usage_count: (ch.usage_count ?? 0) + 1 });
-  }
+  await db.channels.where('id').equals(id).modify(ch => {
+    ch.usage_count = (ch.usage_count ?? 0) + 1;
+  });
 }
 
 export async function createChannel(input: Partial<Channel>): Promise<Channel> {
   const channel: Channel = {
-    id: crypto.randomUUID(),
+    id: input.id ?? crypto.randomUUID(),
     name: input.name ?? '',
     icon: input.icon,
     sort_order: input.sort_order ?? 99,

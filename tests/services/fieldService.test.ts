@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '../../src/db/database';
 import { seedDatabase } from '../../src/db/seed';
-import { getFieldsByCategory, getGlobalFields, createField, deleteField } from '../../src/services/fieldService';
+import { getFieldsByCategory, getGlobalFields, createField, updateField, deleteField } from '../../src/services/fieldService';
 
 describe('fieldService', () => {
   beforeEach(async () => {
     await db.categories.clear();
     await db.channels.clear();
     await db.fields.clear();
+    await db.items.clear();
+    await db.item_field_values.clear();
     await seedDatabase();
   });
 
@@ -40,5 +42,13 @@ describe('fieldService', () => {
     await deleteField('fld-001');
     const fields = await getFieldsByCategory('cat-001');
     expect(fields.length).toBe(4);
+  });
+
+  it('updateField() modifies existing field', async () => {
+    await updateField('fld-001', { key: 'power_plug', label: '电源插头类型', required: true });
+    const field = await db.fields.get('fld-001');
+    expect(field?.key).toBe('power_plug');
+    expect(field?.label).toBe('电源插头类型');
+    expect(field?.required).toBe(true);
   });
 });
