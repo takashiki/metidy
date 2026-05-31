@@ -81,9 +81,11 @@ export async function updateItem(id: string, data: Partial<ItemFormData>): Promi
 
   // EAV incremental update: delete current, re-insert
   if (data.custom_fields) {
+    const item = await db.items.get(id);
+    const categoryId = data.category_id ?? item?.category_id;
     await db.item_field_values.where('item_id').equals(id).delete();
     for (const [key, value] of Object.entries(data.custom_fields)) {
-      const field = await db.fields.where({ key, category_id: data.category_id }).first();
+      const field = await db.fields.where({ key, category_id: categoryId }).first();
       if (field && value !== undefined && value !== '') {
         await db.item_field_values.add({
           item_id: id,

@@ -97,3 +97,48 @@ describe('itemService — displayLabel', () => {
     expect(getDisplayLabel(item)).toBe('剪刀');
   });
 });
+
+describe('itemService — EAV custom fields', () => {
+  beforeEach(async () => {
+    await db.categories.clear();
+    await db.channels.clear();
+    await db.fields.clear();
+    await db.items.clear();
+    await db.item_field_values.clear();
+    await db.locations.clear();
+    await seedDatabase();
+  });
+
+  it('createItem() saves custom field values', async () => {
+    const item = await createItem({
+      ...baseItem,
+      custom_fields: { serial_number: 'SN-12345', charge_port: 'USB-C' },
+    });
+    const detail = await getItemDetail(item.id);
+    expect(detail?.custom_fields?.serial_number).toBe('SN-12345');
+    expect(detail?.custom_fields?.charge_port).toBe('USB-C');
+  });
+
+  it('updateItem() modifies custom field values', async () => {
+    const item = await createItem({
+      ...baseItem,
+      custom_fields: { serial_number: 'SN-12345' },
+    });
+    await updateItem(item.id, {
+      custom_fields: { serial_number: 'SN-UPDATED', charge_port: 'Lightning' },
+    });
+    const detail = await getItemDetail(item.id);
+    expect(detail?.custom_fields?.serial_number).toBe('SN-UPDATED');
+    expect(detail?.custom_fields?.charge_port).toBe('Lightning');
+  });
+
+  it('deleteItem() cascades to delete EAV values', async () => {
+    const item = await createItem({
+      ...baseItem,
+      custom_fields: { serial_number: 'SN-12345' },
+    });
+    await deleteItem(item.id);
+    const eavRows = await db.item_field_values.where('item_id').equals(item.id).toArray();
+    expect(eavRows.length).toBe(0);
+  });
+});
