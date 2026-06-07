@@ -1,5 +1,6 @@
 import { db } from '../db/database';
 import type { Item, ItemDetail, ItemListItem, ItemFormData, ItemFilter } from '../types';
+import { enqueueSyncChange } from './syncService';
 
 function generateId(): string {
   return crypto.randomUUID();
@@ -29,17 +30,21 @@ export async function createItem(data: ItemFormData): Promise<Item> {
     updated_at: now(),
   };
   await db.items.add(item);
+  await enqueueSyncChange('item', item.id, 'create', item);
 
   // Write EAV values
   if (data.custom_fields) {
     for (const [key, value] of Object.entries(data.custom_fields)) {
       const field = await db.fields.where({ key, category_id: data.category_id }).first();
       if (field && value !== undefined && value !== '') {
-        await db.item_field_values.add({
+        const fieldValue = {
+          id: generateId(),
           item_id: item.id,
           field_id: field.id,
           value,
-        });
+        };
+        await db.item_field_values.add(fieldValue);
+        await enqueueSyncChange('item_field_value', fieldValue.id, 'create', fieldValue);
       }
     }
   }
@@ -74,32 +79,60 @@ export async function getItemDetail(id: string): Promise<ItemDetail | null> {
 }
 
 export async function updateItem(id: string, data: Partial<ItemFormData>): Promise<void> {
+  const existing = await db.items.get(id);
   const updateData: Partial<Item> = { ...data, updated_at: now() };
   delete (updateData as any).custom_fields;
   await db.items.update(id, updateData);
+  const updated = await db.items.get(id);
+  if (updated) {
+    await enqueueSyncChange('item', id, 'update', updated, existing?.version);
+  }
 
   // EAV incremental update: delete current, re-insert
   if (data.custom_fields) {
     const item = await db.items.get(id);
     const categoryId = data.category_id ?? item?.category_id;
-    await db.item_field_values.where('item_id').equals(id).delete();
+    const currentValues = await db.item_field_values.where('item_id').equals(id).toArray();
+    for (const currentValue of currentValues) {
+      await db.item_field_values.delete(currentValue.id);
+      await enqueueSyncChange(
+        'item_field_value',
+        currentValue.id,
+        'delete',
+        currentValue,
+        currentValue.version
+      );
+    }
     for (const [key, value] of Object.entries(data.custom_fields)) {
       const field = await db.fields.where({ key, category_id: categoryId }).first();
       if (field && value !== undefined && value !== '') {
-        await db.item_field_values.add({
+        const fieldValue = {
+          id: generateId(),
           item_id: id,
           field_id: field.id,
           value,
-        });
+        };
+        await db.item_field_values.add(fieldValue);
+        await enqueueSyncChange('item_field_value', fieldValue.id, 'create', fieldValue);
       }
     }
   }
 }
 
 export async function deleteItem(id: string): Promise<void> {
-  await db.item_field_values.where('item_id').equals(id).delete();
-  await db.photos.where('item_id').equals(id).delete();
+  const item = await db.items.get(id);
+  const fieldValues = await db.item_field_values.where('item_id').equals(id).toArray();
+  for (const fieldValue of fieldValues) {
+    await db.item_field_values.delete(fieldValue.id);
+    await enqueueSyncChange('item_field_value', fieldValue.id, 'delete', fieldValue, fieldValue.version);
+  }
+  const photos = await db.photos.where('item_id').equals(id).toArray();
+  for (const photo of photos) {
+    await db.photos.delete(photo.id);
+    await enqueueSyncChange('photo', photo.id, 'delete', photo, photo.version);
+  }
   await db.items.delete(id);
+  if (item) await enqueueSyncChange('item', id, 'delete', item, item.version);
 }
 
 export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {

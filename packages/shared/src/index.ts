@@ -47,3 +47,16 @@ export interface SyncPullResponse {
   cursor: string;
   changes: SyncChange[];
 }
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name?: string;
+}
+
+export interface AuthTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  device_id: string;
+  user: AuthUser;
+}

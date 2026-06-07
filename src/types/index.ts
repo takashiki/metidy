@@ -22,6 +22,8 @@ export interface Item {
   notes?: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface Category {
@@ -30,6 +32,10 @@ export interface Category {
   parent_id?: string;
   icon?: string;
   sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface Channel {
@@ -39,6 +45,9 @@ export interface Channel {
   sort_order: number;
   usage_count: number;
   created_at: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface Field {
@@ -51,12 +60,21 @@ export interface Field {
   unit?: string;
   required: boolean;
   sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface ItemFieldValue {
+  id: string;
   item_id: string;
   field_id: string;
   value: any;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface Location {
@@ -64,14 +82,58 @@ export interface Location {
   name: string;
   parent_id?: string;
   type: LocationType;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
 }
 
 export interface Photo {
   id: string;
   item_id: string;
-  blob: Blob;
+  blob?: Blob;
+  object_key?: string;
+  mime_type?: string;
+  size?: number;
+  width?: number;
+  height?: number;
   is_primary: boolean;
   created_at: string;
+  updated_at?: string;
+  deleted_at?: string;
+  version?: number;
+}
+
+export type SyncEntityType =
+  | 'item'
+  | 'category'
+  | 'location'
+  | 'channel'
+  | 'field'
+  | 'item_field_value'
+  | 'photo';
+
+export type SyncOperation = 'create' | 'update' | 'delete';
+export type SyncOutboxStatus = 'pending' | 'syncing' | 'failed';
+
+export interface SyncOutboxEntry {
+  id?: number;
+  entity_type: SyncEntityType;
+  entity_id: string;
+  operation: SyncOperation;
+  base_version?: number;
+  payload: Record<string, unknown>;
+  status: SyncOutboxStatus;
+  attempts: number;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SyncMeta {
+  key: string;
+  value: string;
+  updated_at: string;
 }
 
 // ---- Composite / display types ----

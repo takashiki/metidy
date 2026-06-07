@@ -7,3 +7,10 @@ export const SCHEMA_V1 = {
   locations:          'id, name, parent_id, type',
   photos:             'id, item_id, is_primary',
 };
+
+export const SCHEMA_V2 = {
+  ...SCHEMA_V1,
+  item_field_values:  'id, [item_id+field_id], item_id, field_id',
+  sync_outbox:        '++id, entity_type, entity_id, status, created_at, updated_at',
+  sync_meta:          '&key',
+};

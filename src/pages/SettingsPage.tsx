@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { CategoryManager } from '../components/settings/CategoryManager';
 import { ChannelManager } from '../components/settings/ChannelManager';
 import { FieldManager } from '../components/settings/FieldManager';
+import { SyncManager } from '../components/settings/SyncManager';
 
 export function SettingsPage() {
   return (
@@ -12,10 +13,12 @@ export function SettingsPage() {
           <TabsTrigger value="categories">分类</TabsTrigger>
           <TabsTrigger value="fields">字段配置</TabsTrigger>
           <TabsTrigger value="channels">渠道</TabsTrigger>
+          <TabsTrigger value="sync">同步</TabsTrigger>
         </TabsList>
         <TabsContent value="categories" className="py-4"><CategoryManager /></TabsContent>
         <TabsContent value="fields" className="py-4"><FieldManager /></TabsContent>
         <TabsContent value="channels" className="py-4"><ChannelManager /></TabsContent>
+        <TabsContent value="sync" className="py-4"><SyncManager /></TabsContent>
       </Tabs>
     </div>
   );

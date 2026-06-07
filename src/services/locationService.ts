@@ -1,5 +1,6 @@
 import { db } from '../db/database';
 import type { Location, LocationTreeNode } from '../types';
+import { enqueueSyncChange } from './syncService';
 
 export async function createLocation(input: Partial<Location>): Promise<Location> {
   const location: Location = {
@@ -9,11 +10,15 @@ export async function createLocation(input: Partial<Location>): Promise<Location
     type: input.type ?? '房间',
   };
   await db.locations.add(location);
+  await enqueueSyncChange('location', location.id, 'create', location);
   return location;
 }
 
 export async function updateLocation(id: string, input: Partial<Location>): Promise<void> {
-  await db.locations.update(id, input);
+  const existing = await db.locations.get(id);
+  await db.locations.update(id, { ...input, updated_at: new Date().toISOString() });
+  const updated = await db.locations.get(id);
+  if (updated) await enqueueSyncChange('location', id, 'update', updated, existing?.version);
 }
 
 export async function deleteLocation(id: string): Promise<void> {
@@ -25,9 +30,13 @@ export async function deleteLocation(id: string): Promise<void> {
   // Clear location_id on items at this location
   const items = await db.items.where('location_id').equals(id).toArray();
   for (const item of items) {
-    await db.items.update(item.id, { location_id: undefined });
+    const updated = { ...item, location_id: undefined, updated_at: new Date().toISOString() };
+    await db.items.update(item.id, { location_id: undefined, updated_at: updated.updated_at });
+    await enqueueSyncChange('item', item.id, 'update', updated, item.version);
   }
+  const location = await db.locations.get(id);
   await db.locations.delete(id);
+  if (location) await enqueueSyncChange('location', id, 'delete', location, location.version);
 }
 
 export async function getDescendantIds(locationId: string): Promise<string[]> {

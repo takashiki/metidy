@@ -14,7 +14,10 @@ export const authPlugin = fp(async app => {
 
   app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const payload = await request.jwtVerify<{ sub: string }>();
+      const payload = await request.jwtVerify<{ sub: string; typ?: string; device_id?: string }>();
+      if (payload.typ !== 'access') {
+        throw new Error('invalid token type');
+      }
       request.userId = payload.sub;
     } catch {
       await reply.code(401).send({ error: 'unauthorized' });

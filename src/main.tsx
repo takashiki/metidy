@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { seedDatabase } from './db/seed';
+import { startBackgroundSync } from './services/syncService';
 import './index.css';
 
 async function init() {
@@ -20,6 +21,8 @@ async function init() {
       });
     });
   }
+
+  startBackgroundSync();
 }
 
 init();
