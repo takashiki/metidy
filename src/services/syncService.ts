@@ -229,8 +229,10 @@ async function enqueueBackfillChange(
 async function backfillUnsyncedLocalChanges(): Promise<number> {
   const cursor = (await db.sync_meta.get(syncCursorKey()))?.value ?? '0';
   const includeVersioned = cursor === '0';
+  const localItems = await db.items.count();
   let added = 0;
   for (const row of await db.categories.toArray()) {
+    if (cursor === '0' && localItems === 0 && row.template_key) continue;
     const before = await hasQueuedChange('category', row.id);
     await enqueueBackfillChange('category', row, includeVersioned);
     if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
@@ -241,11 +243,13 @@ async function backfillUnsyncedLocalChanges(): Promise<number> {
     if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
   }
   for (const row of await db.channels.toArray()) {
+    if (cursor === '0' && localItems === 0 && row.template_key) continue;
     const before = await hasQueuedChange('channel', row.id);
     await enqueueBackfillChange('channel', row, includeVersioned);
     if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
   }
   for (const row of await db.fields.toArray()) {
+    if (cursor === '0' && localItems === 0 && row.template_key) continue;
     const before = await hasQueuedChange('field', row.id);
     await enqueueBackfillChange('field', row, includeVersioned);
     if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
@@ -359,15 +363,18 @@ async function applyRemoteChange(change: SyncChange): Promise<void> {
         await db.items.put(payload as any);
         return;
       case 'category':
+        await mergeTemplateCategory(payload);
         await db.categories.put(payload as any);
         return;
       case 'location':
         await db.locations.put(payload as any);
         return;
       case 'channel':
+        await mergeTemplateChannel(payload);
         await db.channels.put(payload as any);
         return;
       case 'field':
+        await mergeTemplateField(payload);
         await db.fields.put(payload as any);
         return;
       case 'item_field_value':
@@ -377,6 +384,48 @@ async function applyRemoteChange(change: SyncChange): Promise<void> {
         await db.photos.put(payload as any);
         return;
     }
+  });
+}
+
+async function mergeTemplateCategory(payload: Record<string, unknown>): Promise<void> {
+  if (typeof payload.template_key !== 'string' || typeof payload.id !== 'string') return;
+  const existing = await db.categories.where('template_key').equals(payload.template_key).first();
+  if (!existing || existing.id === payload.id) return;
+
+  await db.transaction('rw', db.categories, db.fields, db.items, async () => {
+    await db.fields.where('category_id').equals(existing.id).modify(field => {
+      field.category_id = payload.id as string;
+    });
+    await db.items.where('category_id').equals(existing.id).modify(item => {
+      item.category_id = payload.id as string;
+    });
+    await db.categories.delete(existing.id);
+  });
+}
+
+async function mergeTemplateChannel(payload: Record<string, unknown>): Promise<void> {
+  if (typeof payload.template_key !== 'string' || typeof payload.id !== 'string') return;
+  const existing = await db.channels.where('template_key').equals(payload.template_key).first();
+  if (!existing || existing.id === payload.id) return;
+
+  await db.transaction('rw', db.channels, db.items, async () => {
+    await db.items.where('channel_id').equals(existing.id).modify(item => {
+      item.channel_id = payload.id as string;
+    });
+    await db.channels.delete(existing.id);
+  });
+}
+
+async function mergeTemplateField(payload: Record<string, unknown>): Promise<void> {
+  if (typeof payload.template_key !== 'string' || typeof payload.id !== 'string') return;
+  const existing = await db.fields.where('template_key').equals(payload.template_key).first();
+  if (!existing || existing.id === payload.id) return;
+
+  await db.transaction('rw', db.fields, db.item_field_values, async () => {
+    await db.item_field_values.where('field_id').equals(existing.id).modify(value => {
+      value.field_id = payload.id as string;
+    });
+    await db.fields.delete(existing.id);
   });
 }
 
@@ -396,16 +445,27 @@ export async function pushLocalChanges(): Promise<(SyncPushResponse & {
     .toArray();
   if (entries.length === 0) return { accepted: [], conflicts: [], backfilled, queued: 0 };
 
+  const entriesToPush = entries.filter(entry => isUuid(entry.entity_id));
+  const invalidEntries = entries.filter(entry => !isUuid(entry.entity_id));
+  if (invalidEntries.length > 0) {
+    await db.transaction('rw', db.sync_outbox, async () => {
+      for (const entry of invalidEntries) {
+        if (entry.id !== undefined) await db.sync_outbox.delete(entry.id);
+      }
+    });
+  }
+  if (entriesToPush.length === 0) return { accepted: [], conflicts: [], backfilled, queued: 0 };
+
   const timestamp = now();
   await db.transaction('rw', db.sync_outbox, async () => {
-    for (const entry of entries) {
+    for (const entry of entriesToPush) {
       if (entry.id !== undefined) {
         await db.sync_outbox.update(entry.id, { status: 'syncing', updated_at: timestamp });
       }
     }
   });
 
-  const changes = sortOutboxForPush(entries).map(outboxToChange);
+  const changes = sortOutboxForPush(entriesToPush).map(outboxToChange);
   const request: SyncPushRequest = {
     device_id: deviceId,
     changes,
@@ -425,7 +485,7 @@ export async function pushLocalChanges(): Promise<(SyncPushResponse & {
     await applyAcceptedVersions(result.accepted);
 
     await db.transaction('rw', db.sync_outbox, async () => {
-      for (const entry of entries) {
+      for (const entry of entriesToPush) {
         if (entry.id === undefined) continue;
         const key = `${entry.entity_type}:${entry.entity_id}`;
         if (accepted.has(key)) {
@@ -441,7 +501,7 @@ export async function pushLocalChanges(): Promise<(SyncPushResponse & {
       }
     });
 
-    return { ...result, backfilled, queued: entries.length };
+    return { ...result, backfilled, queued: entriesToPush.length };
   } catch (error) {
     await markOutboxFailed(entries, error instanceof Error ? error.message : 'sync failed');
     throw error;
@@ -493,12 +553,14 @@ export async function syncNow(): Promise<{
   syncInProgress = true;
   try {
   const localItems = await db.items.count();
+  const cursor = (await db.sync_meta.get(syncCursorKey()))?.value ?? '0';
+  const initialPull = cursor === '0' ? await pullRemoteChanges() : null;
   const push = await pushLocalChanges();
   const pull = await pullRemoteChanges();
   return {
     pushed: push?.accepted.length ?? 0,
     conflicts: push?.conflicts.length ?? 0,
-    pulled: pull?.changes.length ?? 0,
+    pulled: (initialPull?.changes.length ?? 0) + (pull?.changes.length ?? 0),
     localItems,
     queued: push?.queued ?? 0,
     backfilled: push?.backfilled ?? 0,

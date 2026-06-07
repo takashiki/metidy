@@ -8,8 +8,11 @@ import {
   updateChannel,
   deleteChannel,
 } from '../../src/services/channelService';
+import type { Channel } from '../../src/types';
 
 describe('channelService', () => {
+  let jdChannel: Channel;
+
   beforeEach(async () => {
     await db.categories.clear();
     await db.channels.clear();
@@ -17,6 +20,7 @@ describe('channelService', () => {
     await db.items.clear();
     await db.item_field_values.clear();
     await seedDatabase();
+    jdChannel = (await db.channels.where('template_key').equals('jd').first())!;
   });
 
   it('getAllChannels() returns channels ordered by usage_count DESC', async () => {
@@ -26,12 +30,12 @@ describe('channelService', () => {
   });
 
   it('incrementChannelUsage() increases usage_count', async () => {
-    await incrementChannelUsage('ch-001');
-    const ch = await db.channels.get('ch-001');
+    await incrementChannelUsage(jdChannel.id);
+    const ch = await db.channels.get(jdChannel.id);
     expect(ch?.usage_count).toBe(1);
 
     const sorted = await getAllChannels();
-    expect(sorted[0].id).toBe('ch-001');
+    expect(sorted[0].id).toBe(jdChannel.id);
   });
 
   it('createChannel() inserts with default usage_count=0', async () => {
@@ -41,15 +45,15 @@ describe('channelService', () => {
   });
 
   it('updateChannel() modifies existing channel', async () => {
-    await updateChannel('ch-001', { name: '京东自营', icon: 'star' });
-    const ch = await db.channels.get('ch-001');
+    await updateChannel(jdChannel.id, { name: '京东自营', icon: 'star' });
+    const ch = await db.channels.get(jdChannel.id);
     expect(ch?.name).toBe('京东自营');
     expect(ch?.icon).toBe('star');
   });
 
   it('deleteChannel() removes channel', async () => {
-    await deleteChannel('ch-001');
-    const ch = await db.channels.get('ch-001');
+    await deleteChannel(jdChannel.id);
+    const ch = await db.channels.get(jdChannel.id);
     expect(ch).toBeUndefined();
     const all = await getAllChannels();
     expect(all.length).toBe(4);

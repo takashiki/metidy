@@ -3,7 +3,6 @@ import { randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } fr
 import { promisify } from 'node:util';
 import { z } from 'zod';
 import type { AuthTokenResponse } from '@metidy/shared';
-import { ensureDefaultDataForUser } from '../db/defaultData.js';
 import { prisma } from '../db/prisma.js';
 
 const scrypt = promisify(scryptCallback);
@@ -76,24 +75,20 @@ export const authRoutes: FastifyPluginAsync = async app => {
     const deviceId = randomUUID();
 
     try {
-      const user = await prisma.$transaction(async tx => {
-        const created = await tx.user.create({
-          data: {
-            id: userId,
-            email: body.email,
-            name: body.name,
-            passwordHash: await hashPassword(body.password),
-            devices: {
-              create: {
-                id: deviceId,
-                name: body.device_name,
-                lastSeenAt: new Date(),
-              },
+      const user = await prisma.user.create({
+        data: {
+          id: userId,
+          email: body.email,
+          name: body.name,
+          passwordHash: await hashPassword(body.password),
+          devices: {
+            create: {
+              id: deviceId,
+              name: body.device_name,
+              lastSeenAt: new Date(),
             },
           },
-        });
-        await ensureDefaultDataForUser(tx, created.id);
-        return created;
+        },
       });
 
       return reply.code(201).send(await issueTokens(app, user, deviceId));
@@ -120,16 +115,13 @@ export const authRoutes: FastifyPluginAsync = async app => {
       return reply.code(401).send({ error: 'invalid_credentials' });
     }
 
-    const device = await prisma.$transaction(async tx => {
-      await ensureDefaultDataForUser(tx, user.id);
-      return tx.device.create({
-        data: {
-          id: randomUUID(),
-          userId: user.id,
-          name: body.device_name,
-          lastSeenAt: new Date(),
-        },
-      });
+    const device = await prisma.device.create({
+      data: {
+        id: randomUUID(),
+        userId: user.id,
+        name: body.device_name,
+        lastSeenAt: new Date(),
+      },
     });
 
     return issueTokens(app, user, device.id);

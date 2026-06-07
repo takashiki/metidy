@@ -46,6 +46,7 @@ model Device {
 model Category {
   id        String    @id @db.Char(36)
   userId    String    @map("user_id") @db.Char(36)
+  templateKey String? @map("template_key") @db.VarChar(100)
   name      String    @db.VarChar(100)
   parentId  String?   @map("parent_id") @db.Char(36)
   icon      String?   @db.VarChar(32)
@@ -59,6 +60,7 @@ model Category {
   fields Field[]
   items  Item[]
 
+  @@unique([userId, templateKey])
   @@index([userId, updatedAt])
   @@index([userId, deletedAt])
   @@map("categories")
@@ -67,6 +69,7 @@ model Category {
 model Channel {
   id         String    @id @db.Char(36)
   userId     String    @map("user_id") @db.Char(36)
+  templateKey String?  @map("template_key") @db.VarChar(100)
   name       String    @db.VarChar(100)
   icon       String?   @db.VarChar(32)
   sortOrder  Int       @default(0) @map("sort_order")
@@ -79,6 +82,7 @@ model Channel {
   user  User   @relation(fields: [userId], references: [id])
   items Item[]
 
+  @@unique([userId, templateKey])
   @@index([userId, updatedAt])
   @@map("channels")
 }
@@ -104,6 +108,7 @@ model Location {
 model Field {
   id        String    @id @db.Char(36)
   userId    String    @map("user_id") @db.Char(36)
+  templateKey String? @map("template_key") @db.VarChar(100)
   categoryId String?  @map("category_id") @db.Char(36)
   key       String    @db.VarChar(100)
   label     String    @db.VarChar(100)
@@ -121,6 +126,7 @@ model Field {
   category Category? @relation(fields: [categoryId], references: [id])
   values   ItemFieldValue[]
 
+  @@unique([userId, templateKey])
   @@unique([userId, categoryId, key])
   @@index([userId, updatedAt])
   @@map("fields")

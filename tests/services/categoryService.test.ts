@@ -8,8 +8,12 @@ import {
   updateCategory,
   deleteCategory,
 } from '../../src/services/categoryService';
+import type { Category } from '../../src/types';
 
 describe('categoryService', () => {
+  let applianceCategory: Category;
+  let toolsCategory: Category;
+
   beforeEach(async () => {
     await db.categories.clear();
     await db.channels.clear();
@@ -17,6 +21,8 @@ describe('categoryService', () => {
     await db.items.clear();
     await db.item_field_values.clear();
     await seedDatabase();
+    applianceCategory = (await db.categories.where('template_key').equals('appliance').first())!;
+    toolsCategory = (await db.categories.where('template_key').equals('tools').first())!;
   });
 
   it('getAllCategories() returns all categories ordered by sort_order', async () => {
@@ -27,7 +33,7 @@ describe('categoryService', () => {
   });
 
   it('getCategoryById() returns correct category', async () => {
-    const cat = await getCategoryById('cat-001');
+    const cat = await getCategoryById(applianceCategory.id);
     expect(cat?.name).toBe('家用电器');
   });
 
@@ -45,27 +51,26 @@ describe('categoryService', () => {
   });
 
   it('updateCategory() modifies existing category', async () => {
-    await updateCategory('cat-001', { name: '家电' });
-    const cat = await getCategoryById('cat-001');
+    await updateCategory(applianceCategory.id, { name: '家电' });
+    const cat = await getCategoryById(applianceCategory.id);
     expect(cat?.name).toBe('家电');
   });
 
   it('deleteCategory() removes category', async () => {
-    await deleteCategory('cat-006');
+    await deleteCategory(toolsCategory.id);
     const all = await getAllCategories();
     expect(all.length).toBe(5);
   });
 
   it('deleteCategory() cascades to fields of the deleted category', async () => {
-    // cat-001 (家用电器) has 5 fields seeded
-    const fieldsBefore = await db.fields.where('category_id').equals('cat-001').count();
+    const fieldsBefore = await db.fields.where('category_id').equals(applianceCategory.id).count();
     expect(fieldsBefore).toBe(5);
 
-    await deleteCategory('cat-001');
+    await deleteCategory(applianceCategory.id);
 
-    const fieldsAfter = await db.fields.where('category_id').equals('cat-001').count();
+    const fieldsAfter = await db.fields.where('category_id').equals(applianceCategory.id).count();
     expect(fieldsAfter).toBe(0);
-    const cat = await getCategoryById('cat-001');
+    const cat = await getCategoryById(applianceCategory.id);
     expect(cat).toBeNull();
   });
 

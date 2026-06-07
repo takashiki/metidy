@@ -10,7 +10,7 @@ import type {
   SyncMeta,
   SyncOutboxEntry,
 } from '../types';
-import { SCHEMA_V1, SCHEMA_V2 } from './schema';
+import { SCHEMA_V1, SCHEMA_V2, SCHEMA_V3 } from './schema';
 
 export class MetidyDatabase extends Dexie {
   items!: EntityTable<Item, 'id'>;
@@ -31,6 +31,7 @@ export class MetidyDatabase extends Dexie {
         if (!row.id) row.id = crypto.randomUUID();
       });
     });
+    this.version(3).stores(SCHEMA_V3);
   }
 }
 

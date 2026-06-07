@@ -14,3 +14,10 @@ export const SCHEMA_V2 = {
   sync_outbox:        '++id, entity_type, entity_id, status, created_at, updated_at',
   sync_meta:          '&key',
 };
+
+export const SCHEMA_V3 = {
+  ...SCHEMA_V2,
+  categories:         'id, template_key, name, parent_id, sort_order',
+  channels:           'id, template_key, name, sort_order',
+  fields:             'id, template_key, category_id, key, data_type, sort_order',
+};

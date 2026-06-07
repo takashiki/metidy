@@ -2,7 +2,6 @@ import type { FastifyPluginAsync } from 'fastify';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { SyncPullResponse, SyncPushResponse } from '@metidy/shared';
-import { ensureDefaultDataForUser } from '../db/defaultData.js';
 import { prisma } from '../db/prisma.js';
 
 const syncEntityTypeSchema = z.enum([
@@ -17,7 +16,7 @@ const syncEntityTypeSchema = z.enum([
 
 const syncChangeSchema = z.object({
   entity_type: syncEntityTypeSchema,
-  entity_id: z.string().min(1).max(36),
+  entity_id: z.string().uuid(),
   operation: z.enum(['create', 'update', 'delete']),
   version: z.number().int().positive().optional(),
   base_version: z.number().int().positive().optional(),
@@ -174,6 +173,7 @@ async function applyChange(
       await tx.category.upsert({
         where: { id: change.entity_id },
         update: {
+          templateKey: optionalString(payload.template_key),
           name: stringValue(payload.name),
           parentId: optionalString(payload.parent_id),
           icon: optionalString(payload.icon),
@@ -184,6 +184,7 @@ async function applyChange(
         create: {
           id: change.entity_id,
           userId,
+          templateKey: optionalString(payload.template_key),
           name: stringValue(payload.name),
           parentId: optionalString(payload.parent_id),
           icon: optionalString(payload.icon),
@@ -196,6 +197,7 @@ async function applyChange(
       await tx.channel.upsert({
         where: { id: change.entity_id },
         update: {
+          templateKey: optionalString(payload.template_key),
           name: stringValue(payload.name),
           icon: optionalString(payload.icon),
           sortOrder: numberValue(payload.sort_order, 99),
@@ -206,6 +208,7 @@ async function applyChange(
         create: {
           id: change.entity_id,
           userId,
+          templateKey: optionalString(payload.template_key),
           name: stringValue(payload.name),
           icon: optionalString(payload.icon),
           sortOrder: numberValue(payload.sort_order, 99),
@@ -238,6 +241,7 @@ async function applyChange(
       await tx.field.upsert({
         where: { id: change.entity_id },
         update: {
+          templateKey: optionalString(payload.template_key),
           categoryId: optionalString(payload.category_id),
           key: stringValue(payload.key),
           label: stringValue(payload.label),
@@ -252,6 +256,7 @@ async function applyChange(
         create: {
           id: change.entity_id,
           userId,
+          templateKey: optionalString(payload.template_key),
           categoryId: optionalString(payload.category_id),
           key: stringValue(payload.key),
           label: stringValue(payload.label),
@@ -365,8 +370,6 @@ export const syncRoutes: FastifyPluginAsync = async app => {
     const conflicts: SyncPushResponse['conflicts'] = [];
 
     await prisma.$transaction(async (tx: Transaction) => {
-      await ensureDefaultDataForUser(tx, userId);
-
       for (const change of sortChangesForApply(body.changes)) {
         const current = await getCurrent(tx, userId, change.entity_type, change.entity_id);
         const owner: { userId: string } | null = current

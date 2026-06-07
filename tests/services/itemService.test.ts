@@ -9,14 +9,16 @@ import {
   listItems,
   getDisplayLabel,
 } from '../../src/services/itemService';
-import type { Item } from '../../src/types';
+import type { Category, Item } from '../../src/types';
 
-const baseItem = {
-  name: '手机',
-  category_id: 'cat-003',
-  quantity: 1,
-  status: '在用' as const,
-  currency: 'CNY',
+let electronicsCategory: Category;
+let applianceCategory: Category;
+let baseItem: {
+  name: '手机';
+  category_id: string;
+  quantity: 1;
+  status: '在用';
+  currency: 'CNY';
 };
 
 describe('itemService — basic CRUD', () => {
@@ -28,13 +30,22 @@ describe('itemService — basic CRUD', () => {
     await db.item_field_values.clear();
     await db.locations.clear();
     await seedDatabase();
+    electronicsCategory = (await db.categories.where('template_key').equals('electronics').first())!;
+    applianceCategory = (await db.categories.where('template_key').equals('appliance').first())!;
+    baseItem = {
+      name: '手机',
+      category_id: electronicsCategory.id,
+      quantity: 1,
+      status: '在用',
+      currency: 'CNY',
+    };
   });
 
   it('createItem() creates item with public fields', async () => {
     const item = await createItem({ ...baseItem });
     expect(item.id).toBeDefined();
     expect(item.name).toBe('手机');
-    expect(item.category_id).toBe('cat-003');
+    expect(item.category_id).toBe(electronicsCategory.id);
   });
 
   it('getItemDetail() returns item with category name', async () => {
@@ -59,9 +70,9 @@ describe('itemService — basic CRUD', () => {
   });
 
   it('listItems() filters by category', async () => {
-    await createItem({ ...baseItem, category_id: 'cat-003' });
-    await createItem({ ...baseItem, category_id: 'cat-001', name: '冰箱' });
-    const items = await listItems({ category_id: 'cat-003' });
+    await createItem({ ...baseItem, category_id: electronicsCategory.id });
+    await createItem({ ...baseItem, category_id: applianceCategory.id, name: '冰箱' });
+    const items = await listItems({ category_id: electronicsCategory.id });
     expect(items.length).toBe(1);
     expect(items[0].name).toBe('手机');
   });
@@ -102,6 +113,14 @@ describe('itemService — EAV custom fields', () => {
     await db.item_field_values.clear();
     await db.locations.clear();
     await seedDatabase();
+    electronicsCategory = (await db.categories.where('template_key').equals('electronics').first())!;
+    baseItem = {
+      name: '手机',
+      category_id: electronicsCategory.id,
+      quantity: 1,
+      status: '在用',
+      currency: 'CNY',
+    };
   });
 
   it('createItem() saves custom field values', async () => {

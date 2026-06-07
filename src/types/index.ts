@@ -28,6 +28,7 @@ export interface Item {
 
 export interface Category {
   id: string;
+  template_key?: string;
   name: string;
   parent_id?: string;
   icon?: string;
@@ -40,6 +41,7 @@ export interface Category {
 
 export interface Channel {
   id: string;
+  template_key?: string;
   name: string;
   icon?: string;
   sort_order: number;
@@ -52,6 +54,7 @@ export interface Channel {
 
 export interface Field {
   id: string;
+  template_key?: string;
   category_id?: string;
   key: string;
   label: string;
