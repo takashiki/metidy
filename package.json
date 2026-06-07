@@ -3,10 +3,22 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    ".",
+    "server",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "vite",
+    "dev:web": "vite",
+    "dev:server": "npm --workspace server run dev",
     "build": "tsc -b && vite build",
+    "build:web": "tsc -b && vite build",
+    "build:server": "npm --workspace server run build",
+    "build:all": "npm run build:web && npm run build:server",
     "preview": "vite preview",
+    "db:generate": "npm --workspace server run db:generate",
+    "db:migrate": "npm --workspace server run db:migrate",
     "test": "vitest",
     "test:run": "vitest run"
   },

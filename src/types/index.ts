@@ -9,7 +9,6 @@ export interface Item {
   id: string;
   name: string;
   category_id: string;
-  brand_model?: string;
   quantity: number;
   status: ItemStatus;
   location_id?: string;
@@ -90,7 +89,6 @@ export interface ItemDetail extends Item {
 export interface ItemListItem {
   id: string;
   name: string;
-  brand_model?: string;
   category_id: string;
   category_name?: string;
   status: ItemStatus;
@@ -104,7 +102,6 @@ export interface ItemListItem {
 export interface ItemFormData {
   name: string;
   category_id: string;
-  brand_model?: string;
   quantity: number;
   status: ItemStatus;
   location_id?: string;

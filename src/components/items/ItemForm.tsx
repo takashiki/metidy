@@ -29,7 +29,6 @@ export function ItemForm({ editItem }: ItemFormProps) {
 
   const [name, setName] = useState(editItem?.name ?? '');
   const [categoryId, setCategoryId] = useState(editItem?.category_id ?? '');
-  const [brandModel, setBrandModel] = useState(editItem?.brand_model ?? '');
   const [quantity, setQuantity] = useState(editItem?.quantity ?? 1);
   const [status, setStatus] = useState<ItemStatus>(editItem?.status ?? '在用');
   const [locationId, setLocationId] = useState(editItem?.location_id ?? '');
@@ -53,7 +52,6 @@ export function ItemForm({ editItem }: ItemFormProps) {
     const data: ItemFormData = {
       name: name.trim(),
       category_id: categoryId,
-      brand_model: brandModel.trim() || undefined,
       quantity,
       status,
       location_id: locationId || undefined,
@@ -101,10 +99,6 @@ export function ItemForm({ editItem }: ItemFormProps) {
               {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-        <div>
-          <Label>品牌型号</Label>
-          <Input value={brandModel} onChange={e => setBrandModel(e.target.value)} placeholder="iPhone 15 Pro" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>

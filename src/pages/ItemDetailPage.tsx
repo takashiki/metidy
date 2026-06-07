@@ -40,15 +40,11 @@ export function ItemDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">
-            {item.brand_model ?? item.name}
-            {item.brand_model && item.brand_model !== item.name && (
-              <span className="text-sm font-normal text-muted-foreground ml-2">({item.name})</span>
-            )}
+            {item.name}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <DetailRow label="分类" value={item.category_name} />
-          <DetailRow label="品牌型号" value={item.brand_model} />
           <DetailRow label="数量" value={String(item.quantity)} />
           <DetailRow label="状态" value={item.status} />
           <DetailRow label="位置" value={item.location_name} />

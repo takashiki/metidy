@@ -31,10 +31,10 @@ describe('itemService — basic CRUD', () => {
   });
 
   it('createItem() creates item with public fields', async () => {
-    const item = await createItem({ ...baseItem, brand_model: 'iPhone 15 Pro' });
+    const item = await createItem({ ...baseItem });
     expect(item.id).toBeDefined();
     expect(item.name).toBe('手机');
-    expect(item.brand_model).toBe('iPhone 15 Pro');
+    expect(item.category_id).toBe('cat-003');
   });
 
   it('getItemDetail() returns item with category name', async () => {
@@ -82,12 +82,7 @@ describe('itemService — basic CRUD', () => {
 });
 
 describe('itemService — displayLabel', () => {
-  it('getDisplayLabel() returns brand_model when present', () => {
-    const item = { id: '1', name: '手机', brand_model: 'iPhone 15 Pro' } as Item;
-    expect(getDisplayLabel(item)).toBe('iPhone 15 Pro');
-  });
-
-  it('getDisplayLabel() returns name + location when no brand_model', () => {
+  it('getDisplayLabel() returns name + location when location is present', () => {
     const item = { id: '1', name: '充电线' } as Item;
     expect(getDisplayLabel(item, '主卧')).toBe('充电线 · 主卧');
   });

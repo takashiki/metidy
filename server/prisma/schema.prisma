@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @db.Char(36)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  name         String?   @db.VarChar(100)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt    DateTime? @map("deleted_at") @db.DateTime(3)
+
+  devices     Device[]
+  items       Item[]
+  categories  Category[]
+  locations   Location[]
+  channels    Channel[]
+  fields      Field[]
+  photos      Photo[]
+  syncChanges SyncChange[]
+
+  @@map("users")
+}
+
+model Device {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  name      String?   @db.VarChar(100)
+  lastSeenAt DateTime? @map("last_seen_at") @db.DateTime(3)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  revokedAt DateTime? @map("revoked_at") @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("devices")
+}
+
+model Category {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  name      String    @db.VarChar(100)
+  parentId  String?   @map("parent_id") @db.Char(36)
+  icon      String?   @db.VarChar(32)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  version   BigInt    @default(1)
+
+  user   User       @relation(fields: [userId], references: [id])
+  fields Field[]
+  items  Item[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, deletedAt])
+  @@map("categories")
+}
+
+model Channel {
+  id         String    @id @db.Char(36)
+  userId     String    @map("user_id") @db.Char(36)
+  name       String    @db.VarChar(100)
+  icon       String?   @db.VarChar(32)
+  sortOrder  Int       @default(0) @map("sort_order")
+  usageCount Int       @default(0) @map("usage_count")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt  DateTime? @map("deleted_at") @db.DateTime(3)
+  version    BigInt    @default(1)
+
+  user  User   @relation(fields: [userId], references: [id])
+  items Item[]
+
+  @@index([userId, updatedAt])
+  @@map("channels")
+}
+
+model Location {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  name      String    @db.VarChar(100)
+  parentId  String?   @map("parent_id") @db.Char(36)
+  type      String    @db.VarChar(20)
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  version   BigInt    @default(1)
+
+  user  User   @relation(fields: [userId], references: [id])
+  items Item[]
+
+  @@index([userId, updatedAt])
+  @@map("locations")
+}
+
+model Field {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  categoryId String?  @map("category_id") @db.Char(36)
+  key       String    @db.VarChar(100)
+  label     String    @db.VarChar(100)
+  dataType  String    @map("data_type") @db.VarChar(20)
+  optionsJson Json?   @map("options_json")
+  unit      String?   @db.VarChar(32)
+  required  Boolean   @default(false)
+  sortOrder Int       @default(0) @map("sort_order")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  version   BigInt    @default(1)
+
+  user     User      @relation(fields: [userId], references: [id])
+  category Category? @relation(fields: [categoryId], references: [id])
+  values   ItemFieldValue[]
+
+  @@unique([userId, categoryId, key])
+  @@index([userId, updatedAt])
+  @@map("fields")
+}
+
+model Item {
+  id            String    @id @db.Char(36)
+  userId        String    @map("user_id") @db.Char(36)
+  name          String    @db.VarChar(200)
+  categoryId    String    @map("category_id") @db.Char(36)
+  quantity      Int       @default(1)
+  status        String    @db.VarChar(20)
+  locationId    String?   @map("location_id") @db.Char(36)
+  channelId     String?   @map("channel_id") @db.Char(36)
+  acquiredDate  DateTime? @map("acquired_date") @db.Date
+  price         Decimal?  @db.Decimal(12, 2)
+  currency      String    @default("CNY") @db.VarChar(8)
+  rating        Int?
+  importance    String?   @db.VarChar(20)
+  warrantyUntil DateTime? @map("warranty_until") @db.Date
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt     DateTime? @map("deleted_at") @db.DateTime(3)
+  version       BigInt    @default(1)
+
+  user      User      @relation(fields: [userId], references: [id])
+  category  Category  @relation(fields: [categoryId], references: [id])
+  location  Location? @relation(fields: [locationId], references: [id])
+  channel   Channel?  @relation(fields: [channelId], references: [id])
+  values    ItemFieldValue[]
+  photos    Photo[]
+
+  @@index([userId, updatedAt])
+  @@index([userId, status])
+  @@index([userId, categoryId])
+  @@map("items")
+}
+
+model ItemFieldValue {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  itemId    String    @map("item_id") @db.Char(36)
+  fieldId   String    @map("field_id") @db.Char(36)
+  valueJson Json      @map("value_json")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  version   BigInt    @default(1)
+
+  user  User  @relation(fields: [userId], references: [id])
+  item  Item  @relation(fields: [itemId], references: [id])
+  field Field @relation(fields: [fieldId], references: [id])
+
+  @@unique([userId, itemId, fieldId])
+  @@index([userId, updatedAt])
+  @@map("item_field_values")
+}
+
+model Photo {
+  id        String    @id @db.Char(36)
+  userId    String    @map("user_id") @db.Char(36)
+  itemId    String    @map("item_id") @db.Char(36)
+  objectKey String    @map("object_key") @db.VarChar(512)
+  mimeType  String    @map("mime_type") @db.VarChar(100)
+  size      Int
+  width     Int?
+  height    Int?
+  isPrimary Boolean   @default(false) @map("is_primary")
+  createdAt DateTime  @default(now()) @map("created_at") @db.DateTime(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.DateTime(3)
+  deletedAt DateTime? @map("deleted_at") @db.DateTime(3)
+  version   BigInt    @default(1)
+
+  user User @relation(fields: [userId], references: [id])
+  item Item @relation(fields: [itemId], references: [id])
+
+  @@index([userId, itemId])
+  @@index([userId, updatedAt])
+  @@map("photos")
+}
+
+model SyncChange {
+  id         BigInt   @id @default(autoincrement())
+  userId     String   @map("user_id") @db.Char(36)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   String   @map("entity_id") @db.Char(36)
+  operation  String   @db.VarChar(20)
+  version    BigInt
+  changedAt  DateTime @default(now()) @map("changed_at") @db.DateTime(3)
+  payloadJson Json    @map("payload_json")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, id])
+  @@index([userId, entityType, entityId])
+  @@map("sync_changes")
+}

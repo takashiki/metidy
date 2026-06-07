@@ -14,7 +14,6 @@ export async function createItem(data: ItemFormData): Promise<Item> {
     id: generateId(),
     name: data.name,
     category_id: data.category_id,
-    brand_model: data.brand_model,
     quantity: data.quantity ?? 1,
     status: data.status ?? '在用',
     location_id: data.location_id,
@@ -125,7 +124,6 @@ export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {
     const q = filter.search.toLowerCase();
     items = items.filter(i =>
       i.name.toLowerCase().includes(q) ||
-      (i.brand_model && i.brand_model.toLowerCase().includes(q)) ||
       (i.notes && i.notes.toLowerCase().includes(q))
     );
   }
@@ -137,7 +135,6 @@ export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {
     result.push({
       id: item.id,
       name: item.name,
-      brand_model: item.brand_model,
       category_id: item.category_id,
       category_name: category?.name,
       status: item.status,
@@ -154,7 +151,6 @@ export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {
 }
 
 export function getDisplayLabel(item: Item, locationName?: string): string {
-  if (item.brand_model) return item.brand_model;
   if (locationName) return `${item.name} · ${locationName}`;
   return item.name;
 }
