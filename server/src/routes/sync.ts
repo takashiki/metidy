@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from 'fastify';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { SyncPullResponse, SyncPushResponse } from '@metidy/shared';
+import { ensureDefaultDataForUser } from '../db/defaultData.js';
 import { prisma } from '../db/prisma.js';
 
 const syncEntityTypeSchema = z.enum([
@@ -16,7 +17,7 @@ const syncEntityTypeSchema = z.enum([
 
 const syncChangeSchema = z.object({
   entity_type: syncEntityTypeSchema,
-  entity_id: z.string().uuid(),
+  entity_id: z.string().min(1).max(36),
   operation: z.enum(['create', 'update', 'delete']),
   version: z.number().int().positive().optional(),
   base_version: z.number().int().positive().optional(),
@@ -32,6 +33,27 @@ const syncPushSchema = z.object({
 type SyncChangeInput = z.infer<typeof syncChangeSchema>;
 type SyncEntityType = z.infer<typeof syncEntityTypeSchema>;
 type Transaction = Prisma.TransactionClient;
+
+const entityApplyOrder: Record<SyncEntityType, number> = {
+  category: 10,
+  location: 20,
+  channel: 30,
+  field: 40,
+  item: 50,
+  item_field_value: 60,
+  photo: 70,
+};
+
+function sortChangesForApply(changes: SyncChangeInput[]): SyncChangeInput[] {
+  return changes
+    .map((change, index) => ({ change, index }))
+    .sort((left, right) => {
+      const orderDiff =
+        entityApplyOrder[left.change.entity_type] - entityApplyOrder[right.change.entity_type];
+      return orderDiff === 0 ? left.index - right.index : orderDiff;
+    })
+    .map(({ change }) => change);
+}
 
 function optionalString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
@@ -54,9 +76,14 @@ function dateValue(value: unknown): Date | null {
   return new Date(value);
 }
 
-function jsonRecord(value: unknown): Record<string, unknown> {
+function jsonRecord(value: unknown): Prisma.InputJsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return value as Record<string, unknown>;
+  return value as Prisma.InputJsonObject;
+}
+
+function jsonValue(value: unknown): Prisma.InputJsonValue | typeof Prisma.JsonNull {
+  if (value === undefined || value === null) return Prisma.JsonNull;
+  return value as Prisma.InputJsonValue;
 }
 
 function serializePayload(value: unknown): Record<string, unknown> {
@@ -215,7 +242,7 @@ async function applyChange(
           key: stringValue(payload.key),
           label: stringValue(payload.label),
           dataType: stringValue(payload.data_type, 'text'),
-          optionsJson: payload.options ?? null,
+          optionsJson: jsonValue(payload.options),
           unit: optionalString(payload.unit),
           required: booleanValue(payload.required),
           sortOrder: numberValue(payload.sort_order, 99),
@@ -229,7 +256,7 @@ async function applyChange(
           key: stringValue(payload.key),
           label: stringValue(payload.label),
           dataType: stringValue(payload.data_type, 'text'),
-          optionsJson: payload.options ?? null,
+          optionsJson: jsonValue(payload.options),
           unit: optionalString(payload.unit),
           required: booleanValue(payload.required),
           sortOrder: numberValue(payload.sort_order, 99),
@@ -283,7 +310,7 @@ async function applyChange(
         update: {
           itemId: stringValue(payload.item_id),
           fieldId: stringValue(payload.field_id),
-          valueJson: payload.value ?? null,
+          valueJson: jsonValue(payload.value),
           deletedAt: null,
           version,
         },
@@ -292,7 +319,7 @@ async function applyChange(
           userId,
           itemId: stringValue(payload.item_id),
           fieldId: stringValue(payload.field_id),
-          valueJson: payload.value ?? null,
+          valueJson: jsonValue(payload.value),
           version,
         },
       });
@@ -338,7 +365,9 @@ export const syncRoutes: FastifyPluginAsync = async app => {
     const conflicts: SyncPushResponse['conflicts'] = [];
 
     await prisma.$transaction(async (tx: Transaction) => {
-      for (const change of body.changes) {
+      await ensureDefaultDataForUser(tx, userId);
+
+      for (const change of sortChangesForApply(body.changes)) {
         const current = await getCurrent(tx, userId, change.entity_type, change.entity_id);
         const owner: { userId: string } | null = current
           ? { userId: current.userId }

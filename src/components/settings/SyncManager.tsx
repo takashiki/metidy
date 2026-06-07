@@ -13,6 +13,14 @@ import {
 
 type SyncMode = 'login' | 'register';
 
+function syncMessage(result: Awaited<ReturnType<typeof syncNow>>): string {
+  if (!result) return '未连接云端同步';
+  if (result.conflicts > 0) {
+    return `同步完成，本地 ${result.localItems} 条，排队 ${result.queued} 条，补入队 ${result.backfilled} 条，上传 ${result.pushed} 条，下载 ${result.pulled} 条，冲突 ${result.conflicts} 条`;
+  }
+  return `同步完成，本地 ${result.localItems} 条，排队 ${result.queued} 条，补入队 ${result.backfilled} 条，上传 ${result.pushed} 条，下载 ${result.pulled} 条`;
+}
+
 export function SyncManager() {
   const [mode, setMode] = useState<SyncMode>('login');
   const [email, setEmail] = useState('');
@@ -33,8 +41,8 @@ export function SyncManager() {
         await loginForSync({ email, password, device_name: deviceName });
       }
       setConfigured(true);
-      setMessage('已连接云端同步');
-      await syncNow();
+      const result = await syncNow();
+      setMessage(syncMessage(result));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '连接失败');
     } finally {
@@ -46,8 +54,8 @@ export function SyncManager() {
     setBusy(true);
     setMessage('正在同步...');
     try {
-      await syncNow();
-      setMessage('同步完成');
+      const result = await syncNow();
+      setMessage(syncMessage(result));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : '同步失败');
     } finally {

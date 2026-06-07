@@ -12,11 +12,23 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 const ACCESS_TOKEN_KEY = 'metidy.access_token';
 const REFRESH_TOKEN_KEY = 'metidy.refresh_token';
 const DEVICE_ID_KEY = 'metidy.device_id';
-const SYNC_CURSOR_KEY = 'sync.cursor';
+const USER_ID_KEY = 'metidy.user_id';
+const LEGACY_SYNC_CURSOR_KEY = 'sync.cursor';
 const BACKGROUND_SYNC_INTERVAL_MS = 30_000;
+
+const ENTITY_APPLY_ORDER: Record<SyncEntityType, number> = {
+  category: 10,
+  location: 20,
+  channel: 30,
+  field: 40,
+  item: 50,
+  item_field_value: 60,
+  photo: 70,
+};
 
 let applyingRemoteChange = false;
 let backgroundSyncTimer: number | undefined;
+let syncInProgress = false;
 
 function now(): string {
   return new Date().toISOString();
@@ -62,11 +74,23 @@ function storeAuth(response: AuthTokenResponse): AuthTokenResponse {
   localStorage.setItem(ACCESS_TOKEN_KEY, response.access_token);
   localStorage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
   localStorage.setItem(DEVICE_ID_KEY, response.device_id);
+  localStorage.setItem(USER_ID_KEY, response.user.id);
   return response;
 }
 
 export function isSyncConfigured(): boolean {
   return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY) && localStorage.getItem(DEVICE_ID_KEY));
+}
+
+async function ensureSyncIdentity(): Promise<boolean> {
+  if (!isSyncConfigured()) return false;
+  if (localStorage.getItem(USER_ID_KEY)) return true;
+  return refreshAuthToken();
+}
+
+function syncCursorKey(): string {
+  const userId = localStorage.getItem(USER_ID_KEY);
+  return userId ? `sync.cursor.${userId}` : LEGACY_SYNC_CURSOR_KEY;
 }
 
 export async function registerForSync(input: {
@@ -116,6 +140,7 @@ export function clearSyncAuth(): void {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(DEVICE_ID_KEY);
+  localStorage.removeItem(USER_ID_KEY);
 }
 
 export async function enqueueSyncChange(
@@ -160,6 +185,129 @@ function outboxToChange(entry: SyncOutboxEntry): SyncChange {
     changed_at: entry.updated_at,
     payload: entry.payload,
   };
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function sortOutboxForPush(entries: SyncOutboxEntry[]): SyncOutboxEntry[] {
+  return entries
+    .map((entry, index) => ({ entry, index }))
+    .sort((left, right) => {
+      const orderDiff =
+        ENTITY_APPLY_ORDER[left.entry.entity_type] - ENTITY_APPLY_ORDER[right.entry.entity_type];
+      return orderDiff === 0 ? left.index - right.index : orderDiff;
+    })
+    .map(({ entry }) => entry);
+}
+
+async function hasQueuedChange(entityType: SyncEntityType, entityId: string): Promise<boolean> {
+  const count = await db.sync_outbox
+    .where('entity_type')
+    .equals(entityType)
+    .and(entry => entry.entity_id === entityId)
+    .count();
+  return count > 0;
+}
+
+async function enqueueBackfillChange(
+  entityType: SyncEntityType,
+  row: { id: string; version?: number },
+  includeVersioned: boolean
+): Promise<void> {
+  if (
+    (!includeVersioned && row.version !== undefined) ||
+    !isUuid(row.id) ||
+    await hasQueuedChange(entityType, row.id)
+  ) {
+    return;
+  }
+  await enqueueSyncChange(entityType, row.id, 'create', row);
+}
+
+async function backfillUnsyncedLocalChanges(): Promise<number> {
+  const cursor = (await db.sync_meta.get(syncCursorKey()))?.value ?? '0';
+  const includeVersioned = cursor === '0';
+  let added = 0;
+  for (const row of await db.categories.toArray()) {
+    const before = await hasQueuedChange('category', row.id);
+    await enqueueBackfillChange('category', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.locations.toArray()) {
+    const before = await hasQueuedChange('location', row.id);
+    await enqueueBackfillChange('location', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.channels.toArray()) {
+    const before = await hasQueuedChange('channel', row.id);
+    await enqueueBackfillChange('channel', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.fields.toArray()) {
+    const before = await hasQueuedChange('field', row.id);
+    await enqueueBackfillChange('field', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.items.toArray()) {
+    const before = await hasQueuedChange('item', row.id);
+    await enqueueBackfillChange('item', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.item_field_values.toArray()) {
+    const before = await hasQueuedChange('item_field_value', row.id);
+    await enqueueBackfillChange('item_field_value', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  for (const row of await db.photos.toArray()) {
+    const before = await hasQueuedChange('photo', row.id);
+    await enqueueBackfillChange('photo', row, includeVersioned);
+    if (!before && (includeVersioned || row.version === undefined) && isUuid(row.id)) added += 1;
+  }
+  return added;
+}
+
+async function applyAcceptedVersions(accepted: SyncPushResponse['accepted']): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.categories,
+      db.locations,
+      db.channels,
+      db.fields,
+      db.items,
+      db.item_field_values,
+      db.photos,
+    ],
+    async () => {
+      for (const item of accepted) {
+        switch (item.entity_type) {
+          case 'category':
+            await db.categories.update(item.entity_id, { version: item.version });
+            break;
+          case 'location':
+            await db.locations.update(item.entity_id, { version: item.version });
+            break;
+          case 'channel':
+            await db.channels.update(item.entity_id, { version: item.version });
+            break;
+          case 'field':
+            await db.fields.update(item.entity_id, { version: item.version });
+            break;
+          case 'item':
+            await db.items.update(item.entity_id, { version: item.version });
+            break;
+          case 'item_field_value':
+            await db.item_field_values.update(item.entity_id, { version: item.version });
+            break;
+          case 'photo':
+            await db.photos.update(item.entity_id, { version: item.version });
+            break;
+        }
+      }
+    }
+  );
 }
 
 async function markOutboxFailed(entries: SyncOutboxEntry[], error: string): Promise<void> {
@@ -232,16 +380,21 @@ async function applyRemoteChange(change: SyncChange): Promise<void> {
   });
 }
 
-export async function pushLocalChanges(): Promise<SyncPushResponse | null> {
+export async function pushLocalChanges(): Promise<(SyncPushResponse & {
+  backfilled: number;
+  queued: number;
+}) | null> {
   const deviceId = localStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId || !localStorage.getItem(ACCESS_TOKEN_KEY)) return null;
 
+  const backfilled = await backfillUnsyncedLocalChanges();
+
   const entries = await db.sync_outbox
     .where('status')
-    .anyOf('pending', 'failed')
+    .anyOf('pending', 'failed', 'syncing')
     .limit(500)
     .toArray();
-  if (entries.length === 0) return { accepted: [], conflicts: [] };
+  if (entries.length === 0) return { accepted: [], conflicts: [], backfilled, queued: 0 };
 
   const timestamp = now();
   await db.transaction('rw', db.sync_outbox, async () => {
@@ -252,9 +405,10 @@ export async function pushLocalChanges(): Promise<SyncPushResponse | null> {
     }
   });
 
+  const changes = sortOutboxForPush(entries).map(outboxToChange);
   const request: SyncPushRequest = {
     device_id: deviceId,
-    changes: entries.map(outboxToChange),
+    changes,
   };
 
   try {
@@ -267,6 +421,8 @@ export async function pushLocalChanges(): Promise<SyncPushResponse | null> {
     const result = (await response.json()) as SyncPushResponse;
     const accepted = new Set(result.accepted.map(item => `${item.entity_type}:${item.entity_id}`));
     const conflicts = new Set(result.conflicts.map(item => `${item.entity_type}:${item.entity_id}`));
+
+    await applyAcceptedVersions(result.accepted);
 
     await db.transaction('rw', db.sync_outbox, async () => {
       for (const entry of entries) {
@@ -285,7 +441,7 @@ export async function pushLocalChanges(): Promise<SyncPushResponse | null> {
       }
     });
 
-    return result;
+    return { ...result, backfilled, queued: entries.length };
   } catch (error) {
     await markOutboxFailed(entries, error instanceof Error ? error.message : 'sync failed');
     throw error;
@@ -295,7 +451,8 @@ export async function pushLocalChanges(): Promise<SyncPushResponse | null> {
 export async function pullRemoteChanges(): Promise<SyncPullResponse | null> {
   if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return null;
 
-  const cursor = (await db.sync_meta.get(SYNC_CURSOR_KEY))?.value ?? '0';
+  const cursorKey = syncCursorKey();
+  const cursor = (await db.sync_meta.get(cursorKey))?.value ?? '0';
   const response = await apiFetch(`/sync/pull?cursor=${encodeURIComponent(cursor)}`);
   if (!response.ok) throw new Error(`Pull failed: ${response.status}`);
 
@@ -305,7 +462,7 @@ export async function pullRemoteChanges(): Promise<SyncPullResponse | null> {
   }
 
   await db.sync_meta.put({
-    key: SYNC_CURSOR_KEY,
+    key: cursorKey,
     value: result.cursor,
     updated_at: now(),
   });
@@ -313,10 +470,42 @@ export async function pullRemoteChanges(): Promise<SyncPullResponse | null> {
   return result;
 }
 
-export async function syncNow(): Promise<void> {
-  if (!isSyncConfigured()) return;
-  await pushLocalChanges();
-  await pullRemoteChanges();
+export async function syncNow(): Promise<{
+  pushed: number;
+  conflicts: number;
+  pulled: number;
+  localItems: number;
+  queued: number;
+  backfilled: number;
+} | null> {
+  if (!(await ensureSyncIdentity())) return null;
+  if (syncInProgress) {
+    return {
+      pushed: 0,
+      conflicts: 0,
+      pulled: 0,
+      localItems: await db.items.count(),
+      queued: await db.sync_outbox.where('status').anyOf('pending', 'failed', 'syncing').count(),
+      backfilled: 0,
+    };
+  }
+
+  syncInProgress = true;
+  try {
+  const localItems = await db.items.count();
+  const push = await pushLocalChanges();
+  const pull = await pullRemoteChanges();
+  return {
+    pushed: push?.accepted.length ?? 0,
+    conflicts: push?.conflicts.length ?? 0,
+    pulled: pull?.changes.length ?? 0,
+    localItems,
+    queued: push?.queued ?? 0,
+    backfilled: push?.backfilled ?? 0,
+  };
+  } finally {
+    syncInProgress = false;
+  }
 }
 
 export function startBackgroundSync(): void {

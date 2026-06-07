@@ -22,6 +22,7 @@ model User {
   locations   Location[]
   channels    Channel[]
   fields      Field[]
+  itemFieldValues ItemFieldValue[]
   photos      Photo[]
   syncChanges SyncChange[]
 
