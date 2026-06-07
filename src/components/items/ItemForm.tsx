@@ -43,6 +43,9 @@ export function ItemForm({ editItem }: ItemFormProps) {
   const [saving, setSaving] = useState(false);
 
   const flatLocations = locationTree ? flattenLocations(locationTree) : [];
+  const selectedCategory = categories?.find(category => category.id === categoryId);
+  const selectedLocation = flatLocations.find((location: any) => location.id === locationId);
+  const selectedChannel = channels?.find(channel => channel.id === channelId);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,7 +97,11 @@ export function ItemForm({ editItem }: ItemFormProps) {
         <div>
           <Label>分类 *</Label>
           <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? '')} required>
-            <SelectTrigger><SelectValue placeholder="选择分类" /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="选择分类">
+                {selectedCategory ? `${selectedCategory.icon ?? ''} ${selectedCategory.name}`.trim() : undefined}
+              </SelectValue>
+            </SelectTrigger>
             <SelectContent>
               {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
             </SelectContent>
@@ -126,8 +133,12 @@ export function ItemForm({ editItem }: ItemFormProps) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>位置</Label>
-            <Select value={locationId} onValueChange={(v) => setLocationId(v ?? '')}>
-              <SelectTrigger><SelectValue placeholder="选择位置" /></SelectTrigger>
+            <Select value={locationId || 'empty'} onValueChange={(v) => setLocationId(v === 'empty' ? '' : v ?? '')}>
+              <SelectTrigger>
+                <SelectValue placeholder="选择位置">
+                  {selectedLocation ? selectedLocation.name : undefined}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
                 {flatLocations.map((loc: any) => (
@@ -138,8 +149,12 @@ export function ItemForm({ editItem }: ItemFormProps) {
           </div>
           <div>
             <Label>购入渠道</Label>
-            <Select value={channelId} onValueChange={(v) => setChannelId(v ?? '')}>
-              <SelectTrigger><SelectValue placeholder="选择渠道" /></SelectTrigger>
+            <Select value={channelId || 'empty'} onValueChange={(v) => setChannelId(v === 'empty' ? '' : v ?? '')}>
+              <SelectTrigger>
+                <SelectValue placeholder="选择渠道">
+                  {selectedChannel ? `${selectedChannel.name}${selectedChannel.usage_count > 0 ? ` (${selectedChannel.usage_count})` : ''}` : undefined}
+                </SelectValue>
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="empty">— 不填 —</SelectItem>
                 {channels?.map(ch => (

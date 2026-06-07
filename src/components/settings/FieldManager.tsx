@@ -26,6 +26,7 @@ export function FieldManager() {
   const [newOptions, setNewOptions] = useState('');
   const [newUnit, setNewUnit] = useState('');
   const fields = useFieldsForCategory(selectedCategoryId || undefined);
+  const selectedCategory = categories?.find(category => category.id === selectedCategoryId);
 
   const handleAdd = async () => {
     if (!newKey.trim() || !newLabel.trim() || !selectedCategoryId) return;
@@ -50,7 +51,11 @@ export function FieldManager() {
   return (
     <div className="space-y-4">
       <Select value={selectedCategoryId} onValueChange={(v) => setSelectedCategoryId(v ?? '')}>
-        <SelectTrigger><SelectValue placeholder="选择分类查看/添加字段" /></SelectTrigger>
+        <SelectTrigger>
+          <SelectValue placeholder="选择分类查看/添加字段">
+            {selectedCategory ? `${selectedCategory.icon ?? ''} ${selectedCategory.name}`.trim() : undefined}
+          </SelectValue>
+        </SelectTrigger>
         <SelectContent>
           {categories?.map(c => <SelectItem key={c.id} value={c.id}>{c.icon} {c.name}</SelectItem>)}
         </SelectContent>

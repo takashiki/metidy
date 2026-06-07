@@ -28,6 +28,7 @@ export function ItemFilterBar({ categories, onFilterChange }: ItemFilterBarProps
   const handleSearch = (v: string) => { setSearch(v); apply(v, categoryId, status); };
   const handleCategory = (v: string | null) => { setCategoryId(v ?? 'all'); apply(search, v ?? 'all', status); };
   const handleStatus = (v: string | null) => { setStatus(v ?? 'all'); apply(search, categoryId, v ?? 'all'); };
+  const selectedCategory = categories?.find(category => category.id === categoryId);
 
   const clear = () => {
     setSearch(''); setCategoryId('all'); setStatus('all');
@@ -47,7 +48,13 @@ export function ItemFilterBar({ categories, onFilterChange }: ItemFilterBarProps
       </div>
       <Select value={categoryId} onValueChange={handleCategory}>
         <SelectTrigger className="w-[130px]">
-          <SelectValue placeholder="全部分类" />
+          <SelectValue placeholder="全部分类">
+            {categoryId === 'all'
+              ? '全部分类'
+              : selectedCategory
+                ? `${selectedCategory.icon ?? ''} ${selectedCategory.name}`.trim()
+                : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">全部分类</SelectItem>
