@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "dev": "vite",
+    "dev:docker": "docker compose up --build",
     "dev:web": "vite",
     "dev:server": "npm --workspace server run dev",
     "build": "tsc -b && vite build",

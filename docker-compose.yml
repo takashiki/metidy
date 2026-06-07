@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: metidy
+      MYSQL_USER: metidy
+      MYSQL_PASSWORD: metidy
+      MYSQL_ROOT_PASSWORD: metidy-root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -umetidy -pmetidy --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: mysql://metidy:metidy@mysql:3306/metidy
+      JWT_SECRET: dev-only-jwt-secret-change-before-production
+      OSS_REGION: local
+      OSS_BUCKET: metidy-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: >
+      sh -c "npm --workspace server run db:generate
+      && npm --workspace server run db:push
+      && npm --workspace server run dev"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    depends_on:
+      - api
+    environment:
+      VITE_API_PROXY_TARGET: http://api:3000
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  mysql_data:
+  node_modules:
