@@ -19,6 +19,9 @@ export interface Item {
   rating?: number;
   importance?: Importance;
   warranty_until?: string;
+  needs_restock: boolean;
+  restock_interval_days?: number;
+  restock_threshold?: number;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -160,6 +163,12 @@ export interface ItemListItem {
   location_name?: string;
   rating?: number;
   importance?: Importance;
+  quantity: number;
+  needs_restock: boolean;
+  restock_interval_days?: number;
+  restock_threshold?: number;
+  next_restock_date?: string;
+  restock_days_remaining?: number;
   created_at: string;
   display_label: string;
 }
@@ -177,6 +186,9 @@ export interface ItemFormData {
   rating?: number;
   importance?: Importance;
   warranty_until?: string;
+  needs_restock?: boolean;
+  restock_interval_days?: number;
+  restock_threshold?: number;
   notes?: string;
   custom_fields?: Record<string, any>;
 }

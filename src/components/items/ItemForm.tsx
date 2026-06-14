@@ -6,6 +6,7 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
+import { Switch } from '../ui/switch';
 import { DynamicFormSection } from '../fields/DynamicFormSection';
 import { useCategories } from '../../hooks/useCategories';
 import { useChannels } from '../../hooks/useChannels';
@@ -38,6 +39,9 @@ export function ItemForm({ editItem }: ItemFormProps) {
   const [rating, setRating] = useState(editItem?.rating?.toString() ?? '');
   const [importance, setImportance] = useState(editItem?.importance ?? '');
   const [warrantyUntil, setWarrantyUntil] = useState(editItem?.warranty_until ?? '');
+  const [needsRestock, setNeedsRestock] = useState(editItem?.needs_restock ?? false);
+  const [restockIntervalDays, setRestockIntervalDays] = useState(editItem?.restock_interval_days?.toString() ?? '');
+  const [restockThreshold, setRestockThreshold] = useState(editItem?.restock_threshold?.toString() ?? '');
   const [notes, setNotes] = useState(editItem?.notes ?? '');
   const [customFields, setCustomFields] = useState<Record<string, any>>(editItem?.custom_fields ?? {});
   const [saving, setSaving] = useState(false);
@@ -64,6 +68,9 @@ export function ItemForm({ editItem }: ItemFormProps) {
       rating: rating ? Number(rating) : undefined,
       importance: (importance || undefined) as Importance | undefined,
       warranty_until: warrantyUntil || undefined,
+      needs_restock: needsRestock,
+      restock_interval_days: needsRestock && restockIntervalDays ? Number(restockIntervalDays) : undefined,
+      restock_threshold: needsRestock && restockThreshold ? Number(restockThreshold) : undefined,
       notes: notes.trim() || undefined,
       custom_fields: Object.keys(customFields).length > 0 ? customFields : undefined,
     };
@@ -166,7 +173,7 @@ export function ItemForm({ editItem }: ItemFormProps) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label>购入日期</Label>
+            <Label>{needsRestock ? '上次补货日期' : '购入日期'}</Label>
             <Input type="date" value={acquiredDate} onChange={e => setAcquiredDate(e.target.value)} />
           </div>
           <div>
@@ -199,6 +206,39 @@ export function ItemForm({ editItem }: ItemFormProps) {
         <div>
           <Label>保修到期</Label>
           <Input type="date" value={warrantyUntil} onChange={e => setWarrantyUntil(e.target.value)} />
+        </div>
+        <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <Label>需要定期补货</Label>
+              <p className="text-xs text-muted-foreground mt-1">开启后会用“上次补货日期 + 补货周期”计算提醒；每次补货后更新上次补货日期即可。</p>
+            </div>
+            <Switch checked={needsRestock} onCheckedChange={setNeedsRestock} />
+          </div>
+          {needsRestock && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>补货周期（天）</Label>
+                <Input
+                  type="number"
+                  value={restockIntervalDays}
+                  onChange={e => setRestockIntervalDays(e.target.value)}
+                  min={1}
+                  placeholder="例如 14"
+                />
+              </div>
+              <div>
+                <Label>库存提醒数量</Label>
+                <Input
+                  type="number"
+                  value={restockThreshold}
+                  onChange={e => setRestockThreshold(e.target.value)}
+                  min={0}
+                  placeholder="例如 2"
+                />
+              </div>
+            </div>
+          )}
         </div>
         <div>
           <Label>备注</Label>

@@ -147,6 +147,9 @@ model Item {
   rating        Int?
   importance    String?   @db.VarChar(20)
   warrantyUntil DateTime? @map("warranty_until") @db.Date
+  needsRestock  Boolean   @default(false) @map("needs_restock")
+  restockIntervalDays Int? @map("restock_interval_days")
+  restockThreshold Int?   @map("restock_threshold")
   notes         String?   @db.Text
   createdAt     DateTime  @default(now()) @map("created_at") @db.DateTime(3)
   updatedAt     DateTime  @updatedAt @map("updated_at") @db.DateTime(3)

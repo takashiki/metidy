@@ -10,7 +10,7 @@ import type {
   SyncMeta,
   SyncOutboxEntry,
 } from '../types';
-import { SCHEMA_V1, SCHEMA_V2, SCHEMA_V3 } from './schema';
+import { SCHEMA_V1, SCHEMA_V2, SCHEMA_V3, SCHEMA_V4 } from './schema';
 
 export class MetidyDatabase extends Dexie {
   items!: EntityTable<Item, 'id'>;
@@ -32,6 +32,11 @@ export class MetidyDatabase extends Dexie {
       });
     });
     this.version(3).stores(SCHEMA_V3);
+    this.version(4).stores(SCHEMA_V4).upgrade(async tx => {
+      await tx.table('items').toCollection().modify(row => {
+        if (row.needs_restock === undefined) row.needs_restock = false;
+      });
+    });
   }
 }
 

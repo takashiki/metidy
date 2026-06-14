@@ -3,6 +3,8 @@ import { db } from '../../src/db/database';
 import { seedDatabase } from '../../src/db/seed';
 import {
   createItem,
+  getNextRestockDate,
+  getRestockDaysRemaining,
   getItemDetail,
   updateItem,
   deleteItem,
@@ -19,6 +21,7 @@ let baseItem: {
   quantity: 1;
   status: '在用';
   currency: 'CNY';
+  needs_restock: false;
 };
 
 describe('itemService — basic CRUD', () => {
@@ -38,6 +41,7 @@ describe('itemService — basic CRUD', () => {
       quantity: 1,
       status: '在用',
       currency: 'CNY',
+      needs_restock: false,
     };
   });
 
@@ -90,6 +94,70 @@ describe('itemService — basic CRUD', () => {
     const items = await listItems({ search: '手机' });
     expect(items.length).toBe(1);
   });
+
+  it('listItems() prioritizes items that need regular restocking', async () => {
+    await createItem({ ...baseItem, name: '手机' });
+    await createItem({
+      ...baseItem,
+      name: '纸巾',
+      needs_restock: true,
+      acquired_date: '2026-06-01',
+      restock_interval_days: 30,
+      restock_threshold: 2,
+    });
+
+    const items = await listItems();
+
+    expect(items[0].name).toBe('纸巾');
+    expect(items[0].needs_restock).toBe(true);
+    expect(items[0].next_restock_date).toBe('2026-07-01');
+    expect(items[0].restock_interval_days).toBe(30);
+    expect(items[0].restock_threshold).toBe(2);
+  });
+
+  it('listItems() sorts restock items by next restock date urgency', async () => {
+    await createItem({
+      ...baseItem,
+      name: '洗衣液',
+      needs_restock: true,
+      acquired_date: '2026-06-01',
+      restock_interval_days: 60,
+    });
+    await createItem({
+      ...baseItem,
+      name: '牛奶',
+      needs_restock: true,
+      acquired_date: '2026-06-01',
+      restock_interval_days: 7,
+    });
+
+    const items = await listItems();
+
+    expect(items[0].name).toBe('牛奶');
+    expect(items[0].next_restock_date).toBe('2026-06-08');
+  });
+});
+
+describe('itemService — restock schedule', () => {
+  it('getNextRestockDate() calculates next restock from acquired date and interval', () => {
+    const item = {
+      needs_restock: true,
+      acquired_date: '2026-06-01',
+      restock_interval_days: 14,
+    } as Item;
+
+    expect(getNextRestockDate(item)).toBe('2026-06-15');
+  });
+
+  it('getRestockDaysRemaining() returns negative days for overdue items', () => {
+    const item = {
+      needs_restock: true,
+      acquired_date: '2026-06-01',
+      restock_interval_days: 7,
+    } as Item;
+
+    expect(getRestockDaysRemaining(item, new Date('2026-06-10T12:00:00Z'))).toBe(-2);
+  });
 });
 
 describe('itemService — displayLabel', () => {
@@ -120,6 +188,7 @@ describe('itemService — EAV custom fields', () => {
       quantity: 1,
       status: '在用',
       currency: 'CNY',
+      needs_restock: false,
     };
   });
 

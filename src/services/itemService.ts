@@ -10,6 +10,54 @@ function now(): string {
   return new Date().toISOString();
 }
 
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function parseDateOnly(value?: string): Date | null {
+  const match = value?.match(DATE_ONLY_PATTERN);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+}
+
+function formatDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function todayDateOnlyUtc(today = new Date()): Date {
+  return new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+}
+
+export function getNextRestockDate(item: Pick<Item, 'needs_restock' | 'acquired_date' | 'restock_interval_days'>): string | undefined {
+  if (!item.needs_restock || !item.acquired_date || !item.restock_interval_days) return undefined;
+  const lastRestockDate = parseDateOnly(item.acquired_date);
+  if (!lastRestockDate) return undefined;
+
+  const nextRestockDate = new Date(lastRestockDate);
+  nextRestockDate.setUTCDate(nextRestockDate.getUTCDate() + item.restock_interval_days);
+  return formatDateOnly(nextRestockDate);
+}
+
+export function getRestockDaysRemaining(
+  item: Pick<Item, 'needs_restock' | 'acquired_date' | 'restock_interval_days'>,
+  today = new Date()
+): number | undefined {
+  const nextRestockDate = parseDateOnly(getNextRestockDate(item));
+  if (!nextRestockDate) return undefined;
+  return Math.round((nextRestockDate.getTime() - todayDateOnlyUtc(today).getTime()) / MS_PER_DAY);
+}
+
 export async function createItem(data: ItemFormData): Promise<Item> {
   const item: Item = {
     id: generateId(),
@@ -25,6 +73,9 @@ export async function createItem(data: ItemFormData): Promise<Item> {
     rating: data.rating,
     importance: data.importance,
     warranty_until: data.warranty_until,
+    needs_restock: data.needs_restock ?? false,
+    restock_interval_days: data.restock_interval_days,
+    restock_threshold: data.restock_threshold,
     notes: data.notes,
     created_at: now(),
     updated_at: now(),
@@ -165,6 +216,7 @@ export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {
   for (const item of items) {
     const location = item.location_id ? await db.locations.get(item.location_id) : undefined;
     const category = await db.categories.get(item.category_id);
+    const nextRestockDate = getNextRestockDate(item);
     result.push({
       id: item.id,
       name: item.name,
@@ -174,12 +226,28 @@ export async function listItems(filter?: ItemFilter): Promise<ItemListItem[]> {
       location_name: location?.name,
       rating: item.rating,
       importance: item.importance,
+      quantity: item.quantity,
+      needs_restock: item.needs_restock ?? false,
+      restock_interval_days: item.restock_interval_days,
+      restock_threshold: item.restock_threshold,
+      next_restock_date: nextRestockDate,
+      restock_days_remaining: getRestockDaysRemaining(item),
       created_at: item.created_at,
       display_label: getDisplayLabel(item, location?.name),
     });
   }
 
-  result.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  result.sort((a, b) => {
+    if (a.needs_restock !== b.needs_restock) return a.needs_restock ? -1 : 1;
+    if (a.needs_restock && b.needs_restock) {
+      if (a.restock_days_remaining !== undefined && b.restock_days_remaining !== undefined) {
+        return a.restock_days_remaining - b.restock_days_remaining;
+      }
+      if (a.restock_days_remaining !== undefined) return -1;
+      if (b.restock_days_remaining !== undefined) return 1;
+    }
+    return b.created_at.localeCompare(a.created_at);
+  });
   return result;
 }
 

@@ -3,7 +3,7 @@ import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { useItemDetail } from '../hooks/useItems';
-import { deleteItem } from '../services/itemService';
+import { deleteItem, getNextRestockDate, getRestockDaysRemaining } from '../services/itemService';
 import { useState } from 'react';
 
 export function ItemDetailPage() {
@@ -20,6 +20,9 @@ export function ItemDetailPage() {
   }
 
   if (!item) return <p className="text-muted-foreground py-8 text-center">加载中...</p>;
+
+  const nextRestockDate = getNextRestockDate(item);
+  const restockDaysRemaining = getRestockDaysRemaining(item);
 
   return (
     <div className="space-y-4">
@@ -49,11 +52,16 @@ export function ItemDetailPage() {
           <DetailRow label="状态" value={item.status} />
           <DetailRow label="位置" value={item.location_name} />
           <DetailRow label="购入渠道" value={item.channel_name} />
-          <DetailRow label="购入日期" value={item.acquired_date} />
+          <DetailRow label={item.needs_restock ? '上次补货日期' : '购入日期'} value={item.acquired_date} />
           <DetailRow label="价格" value={item.price != null ? `${item.currency ?? 'CNY'} ${item.price}` : undefined} />
           <DetailRow label="评分" value={item.rating ? '★'.repeat(item.rating) + '☆'.repeat(5 - item.rating) : undefined} />
           <DetailRow label="重要性" value={item.importance} />
           <DetailRow label="保修到期" value={item.warranty_until} />
+          <DetailRow label="定期补货" value={item.needs_restock ? '需要' : undefined} />
+          <DetailRow label="补货周期" value={item.restock_interval_days ? `${item.restock_interval_days} 天` : undefined} />
+          <DetailRow label="下次补货日期" value={nextRestockDate} />
+          <DetailRow label="补货提醒" value={formatRestockRemaining(restockDaysRemaining)} />
+          <DetailRow label="库存提醒数量" value={item.restock_threshold !== undefined ? String(item.restock_threshold) : undefined} />
           <DetailRow label="备注" value={item.notes} />
           {item.custom_fields && Object.keys(item.custom_fields).length > 0 && (
             <>
@@ -68,6 +76,13 @@ export function ItemDetailPage() {
       </Card>
     </div>
   );
+}
+
+function formatRestockRemaining(days: number | undefined): string | undefined {
+  if (days === undefined) return undefined;
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+  if (days === 0) return '今天';
+  return `${days} 天后`;
 }
 
 function DetailRow({ label, value }: { label: string; value?: string }) {

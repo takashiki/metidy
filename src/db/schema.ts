@@ -21,3 +21,8 @@ export const SCHEMA_V3 = {
   channels:           'id, template_key, name, sort_order',
   fields:             'id, template_key, category_id, key, data_type, sort_order',
 };
+
+export const SCHEMA_V4 = {
+  ...SCHEMA_V3,
+  items:              'id, name, category_id, status, needs_restock, location_id, channel_id, acquired_date',
+};
